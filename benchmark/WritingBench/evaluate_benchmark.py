@@ -54,7 +54,8 @@ class EvalAgent(object):
         if success:
             return response
         else:
-            raise ValueError("Fail to generate score!")
+            return None
+            # raise ValueError("Fail to generate score!")
 
 def save_output(output, file_name):
     """
