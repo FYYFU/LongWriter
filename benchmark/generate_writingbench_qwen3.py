@@ -16,7 +16,7 @@ import torch.multiprocessing as mp
 
 window_size = 0
 group_size = 0
-enable_thinking = False
+enable_thinking = True
 
 def count_words(text):
     chinese_characters = re.findall(r'[\u4e00-\u9fff]', text)
@@ -110,13 +110,13 @@ if __name__ == '__main__':
 
     seed_everything(42)
 
-    model = 'Qwen3-8B'
-    path = 'Qwen/Qwen3-8B'
+    model = 'Qwen3-32B'
+    path = 'Qwen/Qwen3-32B'
 
     data_path = '/home/greenland-user/LongWriter/benchmark/WritingBench/benchmark_query/benchmark_all.jsonl'
 
-    os.makedirs(f"WrintingBench_outputs/models/{model}", exist_ok=True)
-    fout = open(f"WrintingBench_outputs/models/{model}/pred_extend_w{window_size}_g{group_size}_t{enable_thinking}.jsonl", 'w', encoding='utf-8')
+    os.makedirs(f"WritingBench_outputs/models/{model}", exist_ok=True)
+    fout = open(f"WritingBench_outputs/models/{model}/pred_extend_w{window_size}_g{group_size}_t{enable_thinking}.jsonl", 'w', encoding='utf-8')
 
     tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
     world_size = torch.cuda.device_count()

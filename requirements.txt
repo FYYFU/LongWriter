@@ -1,8 +1,8 @@
 tqdm
 numpy
-vllm
+vllm==0.8.5
 torch>=2.2.0
-transformers>=4.51.0
+transformers==4.53.0
 datasets
 einops>=0.8.0
 accelerate
