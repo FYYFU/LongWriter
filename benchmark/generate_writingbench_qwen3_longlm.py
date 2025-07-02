@@ -16,7 +16,7 @@ import LongLM.selfextend
 
 window_size = 512
 group_size = 2
-enable_thinking = True
+enable_thinking = False
 use_flash=False
 
 def count_words(text):
