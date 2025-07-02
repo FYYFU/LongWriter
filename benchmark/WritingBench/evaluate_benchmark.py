@@ -5,6 +5,8 @@ import jsonlines
 from tqdm import tqdm
 from prompt import evaluate_system, evaluate_prompt
 from evaluator import ClaudeAgent, CriticAgent
+import torch._dynamo
+torch._dynamo.config.suppress_errors = True
 
 EVAL_TIMES = 1
 
