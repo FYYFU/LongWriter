@@ -16,7 +16,7 @@ import LongLM.selfextend
 
 window_size = 512
 group_size = 2
-enable_thinking = False
+enable_thinking = True
 use_flash=False
 
 def count_words(text):
@@ -118,8 +118,8 @@ def seed_everything(seed):
 
 
 
-def main_worker(rank, world_size, args):
-    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in range(rank*world_size, (rank+1)*world_size))
+def main_worker(rank, world_size, size, shift, args):
+    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(str(i+shift) for i in range(rank*size, (rank+1)*size))
 
     out_path = os.path.join(args.out_dir, f"pred_rank{rank}_w{window_size}_g{group_size}_t{enable_thinking}.jsonl")
     fout = open(out_path, 'w', encoding='utf-8')
@@ -139,13 +139,15 @@ def main_worker(rank, world_size, args):
 if __name__ == '__main__':
     seed_everything(42)
 
-    model_name = 'Qwen3-32B'
-    model_path = 'Qwen/Qwen3-32B'
+    model_name = 'Qwen3-8B'
+    model_path = 'Qwen/Qwen3-8B'
     data_path = '/home/greenland-user/LongWriter/benchmark/WritingBench/benchmark_query/benchmark_all.jsonl'
     out_dir = f"WritingBench_outputs/models/{model_name}"
     os.makedirs(out_dir, exist_ok=True)
 
     world_size = 2
+    size = 2
+    shift = 4
 
     args = argparse.Namespace(
         model_path=model_path,
@@ -155,7 +157,7 @@ if __name__ == '__main__':
 
     mp.spawn(
         main_worker,
-        args=(world_size, args),
+        args=(world_size, size, shift, args),
         nprocs=world_size,
         join=True
     )
