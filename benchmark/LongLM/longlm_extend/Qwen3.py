@@ -33,10 +33,10 @@ def rotate_half(x):
 def apply_longlm_rotary_pos_emb(q, k, cos, sin, position_ids, group_size=1, window_size=4096):
 
     import ipdb
-    cos2d = cos.squeeze(1).squeeze(0)
-    sin2d = sin.squeeze(1).squeeze(0)
+    cos2d = cos.squeeze(1).squeeze(0).to(q.device)
+    sin2d = sin.squeeze(1).squeeze(0).to(q.device)
 
-    pos_q = position_ids # [batch, q_len]
+    pos_q = position_ids      # [batch, q_len]
     pos_k = torch.arange(cos2d.shape[0], device=cos2d.device, dtype=position_ids.dtype)
     pos_k = pos_k.view(1, -1) # [1, kv_len]
 
