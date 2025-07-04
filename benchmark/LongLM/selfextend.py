@@ -137,29 +137,19 @@ def apply(loaded_model, group_size, window_size, enable_flash_attention=False, s
                 raise Exception(f"Failed to modify the attention method of {arch_name}")
 
     elif 'Qwen3' in arch_name:
-        if enable_flash_attention:
-            self_extend_attention_forward = partial(SE.Qwen3.flash_self_extend_forward,
-                                            group_size_1=group_size, 
-                                            group_size_2=window_size,
-                                            scale_base=scale_base)
-            modifed_1 = modify_method_of_instance(loaded_model, "Qwen2FlashAttention3", "_flash_attention_forward", SE.selfextend_flash_attn.flash_attention2_forward_with_window_size)
-            modifed_2 = modify_method_of_instance(loaded_model, "Qwen2FlashAttention3", "forward", self_extend_attention_forward)
-            print("Using flash_attn flash self_extend!!")
-            if (not modifed_1) or (not modifed_2):
-                raise Exception(f"Failed to modify the attention method of {arch_name}")
-        else:
-            self_extend_attention_forward = partial(SE.Qwen3.longlm_forward,
-                                            group_size=group_size, 
-                                            window_size=window_size)
-            modifed_2 = modify_method_of_instance(loaded_model, "Qwen3Attention", "forward", self_extend_attention_forward)
-            
-            rotary_embed = loaded_model.model.rotary_emb
-            for layer in loaded_model.model.layers:
-                layer.self_attn.rotary_emb = rotary_embed
 
-            print('Use longLM')
-            if not modifed_2:
-                raise Exception(f"Failed to modify the attention method of {arch_name}")
+        self_extend_attention_forward = partial(SE.Qwen3.longlm_forward,
+                                        group_size=group_size, 
+                                        window_size=window_size)
+        modifed_2 = modify_method_of_instance(loaded_model, "Qwen3Attention", "forward", self_extend_attention_forward)
+        
+        rotary_embed = loaded_model.model.rotary_emb
+        for layer in loaded_model.model.layers:
+            layer.self_attn.rotary_emb = rotary_embed
+
+        print('Use longLM')
+        if not modifed_2:
+            raise Exception(f"Failed to modify the attention method of {arch_name}")
 
     else:
         raise NotImplementedError

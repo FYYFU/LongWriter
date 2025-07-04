@@ -100,7 +100,7 @@ def get_pred(rank, world_size, data, path, tokenizer, fout):
         dt["response"] = content
         fout.write(json.dumps(dt, ensure_ascii=False)+'\n')
         fout.flush()
-        print(content)
+        # print(content)
 
 def seed_everything(seed):
     torch.manual_seed(seed)
