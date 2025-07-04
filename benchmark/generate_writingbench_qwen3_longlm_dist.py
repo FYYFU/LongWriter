@@ -142,54 +142,19 @@ def main_worker(rank: int, world_size: int, size: int, shift: int, args):
             )[0][len(inputs.input_ids[0]):].tolist()
 
             if enable_thinking:
-
-                prompt = tokenizer.apply_chat_template(
-                    [{'role': 'user', 'content': prompt}],
-                    tokenize=False,
-                    add_generation_prompt=True,
-                    enable_thinking=True
-                )
-                input = tokenizer(prompt, truncation=False, return_tensors="pt").to(model.device)
-                output = model.generate(
-                    **input,
-                    max_new_tokens=32768,
-                    do_sample=True,
-                    temperature=0.6,
-                    top_k=20,
-                    top_p=0.95
-                )
-                output_ids = output[0][len(input.input_ids[0]):].tolist() 
+                # 151668 is the special <|assistant|> token in Qwen that separates thinking
                 try:
-                    index = len(output_ids) - output_ids[::-1].index(151668)
+                    sep_idx = len(output_ids) - output_ids[::-1].index(151668)
                 except ValueError:
-                    index = 0
-                thinking_content = tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip("\n")
-                content = tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
-
-                dt['think_length'] = count_words(thinking_content)
-                dt['think_response'] = thinking_content
- 
+                    sep_idx = 0
+                thinking_content = tokenizer.decode(output_ids[:sep_idx], skip_special_tokens=True).strip("\n")
+                content = tokenizer.decode(output_ids[sep_idx:], skip_special_tokens=True).strip("\n")
+                dt["think_length"] = count_words(thinking_content)
+                dt["think_response"] = thinking_content
             else:
-                prompt = tokenizer.apply_chat_template(
-                    [{'role': 'user', 'content': prompt}],
-                    tokenize=False,
-                    add_generation_prompt=True,
-                    enable_thinking=False
-                )
-                input = tokenizer(prompt, truncation=False, return_tensors="pt").to(model.device)
-                output = model.generate(
-                    **input,
-                    max_new_tokens=32768,
-                    do_sample=True,
-                    temperature=0.7,
-                    top_k=20,
-                    top_p=0.8
-                )
-                output_ids = output[0][len(input.input_ids[0]):].tolist() 
-                dt['think_length'] = 0
-                dt['think_response'] = None
                 content = tokenizer.decode(output_ids, skip_special_tokens=True).strip("\n")
-
+                dt["think_length"] = 0
+                dt["think_response"] = None
 
             dt["response_length"] = count_words(content)
             dt["response"] = content
@@ -233,10 +198,10 @@ if __name__ == "__main__":
 
     # Merge outputs from all ranks
     merged_path = os.path.join(out_dir, f"pred_merged_w{window_size}_g{group_size}_t{enable_thinking}.jsonl")
-    with open(merged_path, "w", encoding="utf-8") as fout_merged:
+    with open(merged_path, "w", encoding="utf‑8") as fout_merged:
         for rank in range(world_size):
             part = os.path.join(out_dir, f"pred_rank{rank}_w{window_size}_g{group_size}_t{enable_thinking}.jsonl")
-            with open(part, "r", encoding="utf-8") as fin:
+            with open(part, "r", encoding="utf‑8") as fin:
                 for line in fin:
                     fout_merged.write(line)
     print(f"Merged output → {merged_path}")
