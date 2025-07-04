@@ -171,8 +171,8 @@ def main_worker(rank: int, world_size: int, size: int, shift: int, args):
 if __name__ == "__main__":
     seed_everything(42)
 
-    model_name = "Qwen3-8B"
-    model_path = "Qwen/Qwen3-8B"
+    model_name = "Qwen3-32B"
+    model_path = "Qwen/Qwen3-32B"
     data_path = "/home/greenland-user/LongWriter/benchmark/WritingBench/benchmark_query/benchmark_all.jsonl"
     out_dir = f"WritingBench_outputs/models/{model_name}"
     os.makedirs(out_dir, exist_ok=True)
