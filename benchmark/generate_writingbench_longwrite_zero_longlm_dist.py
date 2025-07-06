@@ -14,8 +14,8 @@ from tqdm import tqdm
 # ---------------------------------------------------------------------------
 # Hyper‑parameters – tweak as you like
 # ---------------------------------------------------------------------------
-window_size = 512          # sliding window length for LongLM.selfextend
-group_size = 2             # number of heads to patch together
+window_size = 256          # sliding window length for LongLM.selfextend
+group_size = 8             # number of heads to patch together
 use_flash = False          # use flash‑attention v2 when available
 
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     os.makedirs(out_dir, exist_ok=True)
 
     # Multi‑processing settings
-    world_size = 4   # number of processes
+    world_size = 8   # number of processes
     size = 1         # number of GPUs per process (set 1 for one‑GPU‑per‑proc)
     shift = 0        # start GPU index
 
@@ -197,10 +197,10 @@ if __name__ == "__main__":
     )
 
     # Merge outputs from all ranks
-    merged_path = os.path.join(out_dir, f"pred_merged_w{window_size}_g{group_size}_t{enable_thinking}.jsonl")
+    merged_path = os.path.join(out_dir, f"pred_merged_w{window_size}_g{group_size}.jsonl")
     with open(merged_path, "w", encoding="utf‑8") as fout_merged:
         for rank in range(world_size):
-            part = os.path.join(out_dir, f"pred_rank{rank}_w{window_size}_g{group_size}_t{enable_thinking}.jsonl")
+            part = os.path.join(out_dir, f"pred_rank{rank}_w{window_size}_g{group_size}.jsonl")
             with open(part, "r", encoding="utf‑8") as fin:
                 for line in fin:
                     fout_merged.write(line)
