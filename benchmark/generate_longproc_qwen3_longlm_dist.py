@@ -11,13 +11,12 @@ import numpy as np
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from tqdm import tqdm
-from longproc.longproc_data import load_longproc_data
+from LongProc.longproc.longproc_data import load_longproc_data
 
 # ---------------------------------------------------------------------------
 # Hyper‑parameters – tweak as you like
 # ---------------------------------------------------------------------------
-window_size = 512          # sliding window length for LongLM.selfextend
-group_size = 2             # number of heads to patch together
+
 enable_thinking = True     # whether to use Qwen "thinking" channel
 use_flash = False          # use flash‑attention v2 when available
 
@@ -67,7 +66,7 @@ def main_worker(rank: int, world_size: int, size: int, shift: int, args):
     # Create per‑rank output file
     out_path = os.path.join(
         args.out_dir,
-        f"pred_rank{rank}_w{window_size}_g{group_size}_t{enable_thinking}.jsonl",
+        f"pred_rank{rank}_t{args.task_name}_w{args.window_size}_g{args.group_size}_s{args.sub_size}.jsonl",
     )
     with open(out_path, "w", encoding="utf‑8") as fout:
 
@@ -91,25 +90,26 @@ def main_worker(rank: int, world_size: int, size: int, shift: int, args):
         ).eval()
 
         # Patch LongLM extension if requested
-        if window_size and group_size:
+        if args.window_size and args.group_size:
             selfextend.apply(
                 model,
-                group_size,
-                window_size,
+                args.group_size,
+                args.window_size,
                 enable_flash_attention=use_flash,
                 flash_attention_impl="flash_attn",
             )
 
         # ---- Slice the dataset for this rank -----------------------------------------
-        with open(args.data_path, "r", encoding="utf‑8") as f_data:
-            all_data = [json.loads(line) for line in f_data]
+        # with open(args.data_path, "r", encoding="utf‑8") as f_data:
+        #     all_data = [json.loads(line) for line in f_data]
+        # subset = [dt for i, dt in enumerate(all_data) if i % world_size == rank]
+        all_data, eval_func = load_longproc_data(f"{args.task_name}_{args.sub_size}", './LongProc/data')
         subset = [dt for i, dt in enumerate(all_data) if i % world_size == rank]
 
         # ---- Inference loop -----------------------------------------------------------
         for dt in tqdm(subset, desc=f"Rank {rank}"):
-            user_query = dt["query"]
+            user_query = dt["input_prompt"]
 
-            # Build prompt (thinking or not)
             prompt = tokenizer.apply_chat_template(
                 [{"role": "user", "content": user_query}],
                 tokenize=False,
@@ -128,7 +128,6 @@ def main_worker(rank: int, world_size: int, size: int, shift: int, args):
             )[0][len(inputs.input_ids[0]):].tolist()
 
             if enable_thinking:
-                # 151668 is the special <|assistant|> token in Qwen that separates thinking
                 try:
                     sep_idx = len(output_ids) - output_ids[::-1].index(151668)
                 except ValueError:
@@ -145,6 +144,9 @@ def main_worker(rank: int, world_size: int, size: int, shift: int, args):
             dt["response_length"] = count_words(content)
             dt["response"] = content
 
+            metrics = eval_func(content, dt)
+            dt['metrics'] = metrics
+
             fout.write(json.dumps(dt, ensure_ascii=False) + "\n")
             fout.flush()
 
@@ -157,37 +159,42 @@ def main_worker(rank: int, world_size: int, size: int, shift: int, args):
 if __name__ == "__main__":
     seed_everything(42)
 
-    model_name = "Qwen3-32B"
-    model_path = "Qwen/Qwen3-32B"
-    data_path = "/home/greenland-user/LongWriter/benchmark/WritingBench/benchmark_query/benchmark_all.jsonl"
-    out_dir = f"WritingBench_outputs/models/{model_name}"
+    model_name = "Qwen3-8B"
+    model_path = "Qwen/Qwen3-8B"
+    task_name = 'html_to_tsv'
+    out_dir = f"LongProc_outputs/models/{model_name}"
+    
     os.makedirs(out_dir, exist_ok=True)
 
-    # Multi‑processing settings
-    world_size = 8   # number of processes
-    size = 1         # number of GPUs per process (set 1 for one‑GPU‑per‑proc)
-    shift = 0        # start GPU index
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", default=model_path)
-    parser.add_argument("--data_path", default=data_path)
-    parser.add_argument("--out_dir", default=out_dir)
-    cli_args = parser.parse_args([])  # empty list -> use defaults
+    for sub_size in ['2k', '8k']:
+        # Multi‑processing settings
+        world_size = 8   # number of processes
+        size = 1         # number of GPUs per process (set 1 for one‑GPU‑per‑proc)
+        shift = 0        # start GPU index
 
-    # Spawn workers
-    mp.spawn(
-        main_worker,
-        args=(world_size, size, shift, cli_args),
-        nprocs=world_size,
-        join=True,
-    )
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--model_path", default=model_path)
+        parser.add_argument("--task_name", default=task_name)
+        parser.add_argument("--out_dir", default=out_dir)
+        parser.add_argument('--sub_size', default=sub_size)
+        parser.add_argument('--window_size', default=0)
+        parser.add_argument('--group_size', default=0)
+        cli_args = parser.parse_args([])  # empty list -> use defaults
 
-    # Merge outputs from all ranks
-    merged_path = os.path.join(out_dir, f"pred_merged_w{window_size}_g{group_size}_t{enable_thinking}.jsonl")
-    with open(merged_path, "w", encoding="utf‑8") as fout_merged:
-        for rank in range(world_size):
-            part = os.path.join(out_dir, f"pred_rank{rank}_w{window_size}_g{group_size}_t{enable_thinking}.jsonl")
-            with open(part, "r", encoding="utf‑8") as fin:
-                for line in fin:
-                    fout_merged.write(line)
-    print(f"Merged output → {merged_path}")
+        # Spawn workers
+        mp.spawn(
+            main_worker,
+            args=(world_size, size, shift, cli_args),
+            nprocs=world_size,
+            join=True,
+        )
+        # Merge outputs from all ranks
+        merged_path = os.path.join(out_dir, f"pred_merged_t{task_name}_w{args.window_size}_g{args.group_size}_s{sub_size}.jsonl")
+        with open(merged_path, "w", encoding="utf‑8") as fout_merged:
+            for rank in range(world_size):
+                part = os.path.join(out_dir, f"pred_rank{rank}_t{task_name}_w{ars.window_size}_g{args.group_size}_s{sub_size}.jsonl")
+                with open(part, "r", encoding="utf‑8") as fin:
+                    for line in fin:
+                        fout_merged.write(line)
+        print(f"Merged output → {merged_path}")
