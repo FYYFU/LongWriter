@@ -40,14 +40,15 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     k_embed = (k * cos) + (rotate_half(k) * sin) if k is not None else None
     return q_embed, k_embed
 
-def apply_longlm_rotary_pos_emb(q, k, cos, sin, position_ids, group_size=1, window_size=4096):
+def apply_longlm_rotary_pos_emb(q, k, cos, sin, position_ids, key_position_ids, group_size=1, window_size=4096):
 
     cos2d = cos.squeeze(1).squeeze(0)
     sin2d = sin.squeeze(1).squeeze(0)
 
     pos_q = position_ids # [batch, q_len]
-    pos_k = torch.arange(cos2d.shape[0], device=cos2d.device, dtype=position_ids.dtype)
-    pos_k = pos_k.view(1, -1) # [1, kv_len]
+    # pos_k = torch.arange(cos2d.shape[0], device=cos2d.device, dtype=position_ids.dtype)
+    # pos_k = pos_k.view(1, -1) # [1, kv_len]
+    pos_k = key_position_ids
 
     window_size = 0 if position_ids.max() < window_size else window_size
     pos_q_g = pos_q // group_size + window_size - window_size // group_size
@@ -359,9 +360,11 @@ def longlm_forward(
         kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
 
     if q_len  == 1:
-        key_position = torch.arange(kv_seq_len, dtype=position_ids.dtype).to(query_states.device).view(1, kv_seq_len) # only support batch=1 for now.
+        # key_position = torch.arange(kv_seq_len, dtype=position_ids.dtype).to(query_states.device).view(1, kv_seq_len) # only support batch=1 for now.
+        key_position = self.max_position_ids[:, :kv_seq_len]
         cos, sin = self.rotary_emb(value_states, key_position)
     else:
+        key_position = position_ids
         cos, sin = self.rotary_emb(value_states, position_ids)
     cos = cos.to(query_states.device)
     sin = sin.to(query_states.device)
@@ -377,7 +380,7 @@ def longlm_forward(
     if self.config._attn_implementation == "eager":
         neighbor_query_states, neighbor_key_states, \
         group_query_states, group_key_states = apply_longlm_rotary_pos_emb(
-            query_states, key_states, cos, sin, position_ids=position_ids,
+            query_states, key_states, cos, sin, position_ids=position_ids, key_position_ids=key_position,
             group_size=group_size, window_size=window_size
         )
         attn_output, attn_weights = attention_interface(
@@ -425,7 +428,7 @@ def longlm_forward(
             
             neighbor_query_states, neighbor_key_states, \
             group_query_states, group_key_states = apply_longlm_rotary_pos_emb(
-                query_states, key_states, cos, sin, position_ids=position_ids,
+                query_states, key_states, cos, sin, position_ids=position_ids, key_position_ids=key_position,
                 group_size=group_size, window_size=window_size
             )
             neighbor_query_states = neighbor_query_states.transpose(1, 2).contiguous()

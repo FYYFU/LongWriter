@@ -2,6 +2,7 @@ from types import MethodType
 from functools import partial
 # import longlm_extend as SE
 from . import longlm_extend as SE
+import torch
 
 def modify_method_of_instance(instance, target_class_name, target_method_name, new_method, visited_instances=None):
     """
@@ -128,8 +129,10 @@ def apply(loaded_model, group_size, window_size, enable_flash_attention=False, s
                                             window_size=window_size)
             modifed_2 = modify_method_of_instance(loaded_model, "Qwen2Attention", "forward", self_extend_attention_forward)
             
+            new_buffer = torch.arange(131141, dtype=torch.int64).view(1, 131141)
             rotary_embed = loaded_model.model.rotary_emb
             for layer in loaded_model.model.layers:
+                layer.self_attn.max_position_ids = new_buffer.to(layer.self_attn.q_proj.weight.device)
                 layer.self_attn.rotary_emb = rotary_embed
 
             print('Use longLM')
@@ -142,9 +145,10 @@ def apply(loaded_model, group_size, window_size, enable_flash_attention=False, s
                                         group_size=group_size, 
                                         window_size=window_size)
         modifed_2 = modify_method_of_instance(loaded_model, "Qwen3Attention", "forward", self_extend_attention_forward)
-        
+        new_buffer = torch.arange(131141, dtype=torch.int64).view(1, 131141)
         rotary_embed = loaded_model.model.rotary_emb
         for layer in loaded_model.model.layers:
+            layer.self_attn.max_position_ids = new_buffer.to(layer.self_attn.q_proj.weight.device)
             layer.self_attn.rotary_emb = rotary_embed
 
         print('Use longLM')
