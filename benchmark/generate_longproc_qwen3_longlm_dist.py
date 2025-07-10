@@ -161,13 +161,13 @@ if __name__ == "__main__":
 
     model_name = "Qwen3-8B"
     model_path = "Qwen/Qwen3-8B"
-    task_name = 'html_to_tsv'
+    task_name = 'countdown'
     out_dir = f"LongProc_outputs/models/{model_name}"
     
     os.makedirs(out_dir, exist_ok=True)
 
 
-    for sub_size in ['2k', '8k']:
+    for sub_size in ['0.5k','2k', '8k']:
         # Multi‑processing settings
         world_size = 8   # number of processes
         size = 1         # number of GPUs per process (set 1 for one‑GPU‑per‑proc)
@@ -178,8 +178,8 @@ if __name__ == "__main__":
         parser.add_argument("--task_name", default=task_name)
         parser.add_argument("--out_dir", default=out_dir)
         parser.add_argument('--sub_size', default=sub_size)
-        parser.add_argument('--window_size', default=0)
-        parser.add_argument('--group_size', default=0)
+        parser.add_argument('--window_size', default=512)
+        parser.add_argument('--group_size', default=2)
         cli_args = parser.parse_args([])  # empty list -> use defaults
 
         # Spawn workers
@@ -190,10 +190,10 @@ if __name__ == "__main__":
             join=True,
         )
         # Merge outputs from all ranks
-        merged_path = os.path.join(out_dir, f"pred_merged_t{task_name}_w{args.window_size}_g{args.group_size}_s{sub_size}.jsonl")
+        merged_path = os.path.join(out_dir, f"pred_merged_t{task_name}_w{cli_args.window_size}_g{cli_args.group_size}_s{sub_size}_new.jsonl")
         with open(merged_path, "w", encoding="utf‑8") as fout_merged:
             for rank in range(world_size):
-                part = os.path.join(out_dir, f"pred_rank{rank}_t{task_name}_w{ars.window_size}_g{args.group_size}_s{sub_size}.jsonl")
+                part = os.path.join(out_dir, f"pred_rank{rank}_t{task_name}_w{cli_args.window_size}_g{cli_args.group_size}_s{sub_size}_new.jsonl")
                 with open(part, "r", encoding="utf‑8") as fin:
                     for line in fin:
                         fout_merged.write(line)

@@ -50,8 +50,8 @@ def apply_longlm_rotary_pos_emb(q, k, cos, sin, position_ids, key_position_ids, 
     # pos_k = pos_k.view(1, -1) # [1, kv_len]
     pos_k = key_position_ids
 
-    window_size = 0 if position_ids.max() < window_size else window_size
-    pos_q_g = pos_q // group_size + window_size - window_size // group_size
+    re_window_size = 0 if position_ids.max() < window_size else window_size
+    pos_q_g = pos_q // group_size + re_window_size - re_window_size // group_size
     pos_k_g = pos_k // group_size
 
     def idx(t2d, pos):
@@ -404,9 +404,9 @@ def longlm_forward(
         attn_weights = None
 
         if q_len == 1:
-            window_size = 0 if position_ids.max() < window_size else window_size
+            re_window_size = 0 if position_ids.max() < window_size else window_size
             neighbor_key_position = position_ids[:, -1] - key_position
-            group_key_position = position_ids[:, -1]//group_size - key_position//group_size + (window_size - window_size//group_size)
+            group_key_position = position_ids[:, -1]//group_size - key_position//group_size + (re_window_size - re_window_size//group_size)
             decode_key_position = torch.cat([group_key_position[:, :-window_size], neighbor_key_position[:,-window_size:]], dim=1)
                 
             decode_query_states = query_states.transpose(1,2).contiguous() # position 0: cos 0 = 1, sin 0 = 0
@@ -424,7 +424,7 @@ def longlm_forward(
     
         elif q_len == kv_seq_len:
             # set correct position_ids & apply RoPE.
-            window_size = 0 if position_ids.max() < window_size else window_size # in case that, the smallest q position, g2-g2//g1 exceed the max position
+            # window_size = 0 if position_ids.max() < window_size else window_size # in case that, the smallest q position, g2-g2//g1 exceed the max position
             
             neighbor_query_states, neighbor_key_states, \
             group_query_states, group_key_states = apply_longlm_rotary_pos_emb(
